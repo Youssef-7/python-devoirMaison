@@ -1,218 +1,213 @@
 import csv
-from bs4 import BeautifulSoup
-from urllib.parse import urlparse
 import requests
-#Étape 1 Fonction - Retourne dictionnaire
-def function1(text):
-    mots = text.lower().split()
-    occurrences = {}
-    for mot in mots:
-        if mot in occurrences:
-            occurrences[mot] += 1
-        else:
-            occurrences[mot] = 1
-    occurrences_trie = sorted(occurrences.items(), key=lambda item: item[1], reverse=True)
-    return occurrences_trie
+from urllib.parse import urlparse
+from bs4 import BeautifulSoup
+import tkinter as tk
+from tkinter import ttk, messagebox
 
-texte = "La nature est pleine de beauté. Les arbres, les fleurs, les rivières et les montagnes offrent une diversité incroyable. La beauté de la nature est source d'inspiration pour de nombreux artistes. Admirer un coucher de soleil ou écouter le chant des oiseaux procure un sentiment de paix et d'harmonie avec l'environnement."
+class AnalyseurReferencement:
+    def __init__(self):
+        self.url = ""
+        self.mots_cles = []
+        self.chemin_fichier_parasite = "parasite.csv"
+        self.resultats = []
 
-resultat1 = function1(texte)
+    def recuperer_html_depuis_url(self, url):
+        try:
+            reponse = requests.get(url)
+            reponse.raise_for_status()
+            return reponse.text
+        except requests.RequestException as e:
+            print(f"Erreur lors de la récupération de HTML depuis {url}: {e}")
+            return None
 
-#Étape 2 Fonction - Structure de données privées des mots de la liste parasite
-def filtrer_mots_parasites(donnée_text, mots_parasites):
-    mots_filtrés = {}
-    for mot, occurrences in donnée_text:
-        if mot not in mots_parasites:
-            mots_filtrés[mot] = occurrences
-    return mots_filtrés
-mots_parasites = ["de", "pour", "mais", "le", "la", "les", "est","et", "un","une"]
+    def supprimer_balises_html(self, texte_html):
+        soup = BeautifulSoup(texte_html, 'html.parser')
+        return soup.get_text(separator=' ', strip=True)
 
-resultat2 = filtrer_mots_parasites(resultat1, mots_parasites)
+    def extraire_valeurs_attribut(self, texte_html, balise, attribut):
+        soup = BeautifulSoup(texte_html, 'html.parser')
+        elements = soup.find_all(balise)
+        return [element.get(attribut) for element in elements if element.get(attribut)]
 
-#Étape 3 Fonction - Récupèration des mots parasites dans un fichier parasite.csv
-def recuperer_mots_parasites_from_csv(parasite_file_path):
-    mots_parasites = []
-    with open(parasite_file_path, newline='', encoding='utf-8') as csvfile:
-        reader = csv.reader(csvfile)
-        for row in reader:
-            mots_parasites.extend(row)
-    return mots_parasites
+    def compter_occurrences(self, texte):
+        mots = texte.lower().split()
+        occurrences = {}
+        for mot in mots:
+            if mot in occurrences:
+                occurrences[mot] += 1
+            else:
+                occurrences[mot] = 1
+        occurrences_triees = sorted(occurrences.items(), key=lambda item: item[1], reverse=True)
+        return occurrences_triees
 
-parasite_file_path = "parasite.csv"
-mots_parasites_du_texte = recuperer_mots_parasites_from_csv(parasite_file_path)
+    def filtrer_mots_parasites(self, donnees, mots_parasites):
+        mots_filtres = {}
+        for mot, occurrences in donnees:
+            if mot not in mots_parasites:
+                mots_filtres[mot] = occurrences
+        return mots_filtres
 
-# Étape 4: Teste code
-#** Étape 1: Obtenez les occurrences des mots
-resultat1 = function1(texte)
-print("Étape 1 - Occurrences des mots:")
-print(resultat1)
+    def charger_mots_parasites(self):
+        try:
+            with open(self.chemin_fichier_parasite, newline='', encoding='utf-8') as csvfile:
+                lecteur = csv.reader(csvfile)
+                return [mot for ligne in lecteur for mot in ligne]
+        except FileNotFoundError:
+            print(f"Fichier parasite non trouvé : {self.chemin_fichier_parasite}")
+            return []
 
-#** Étape 2: Filtrez les mots parasites
-resultat2 = filtrer_mots_parasites(resultat1, mots_parasites)
-print("\nÉtape 3 - Mots filtrés:")
-print(resultat2)
+    def mettre_a_jour_mots_cles_parasites(self, nouvelle_liste_mots_cles):
+        try:
+            with open(self.chemin_fichier_parasite, mode='a', newline='', encoding='utf-8') as csvfile:
+                ecrivain = csv.writer(csvfile)
+                ecrivain.writerow(nouvelle_liste_mots_cles)
+            print("Liste des mots parasites mise à jour avec succès.")
+        except IOError:
+            print("Une erreur s'est produite lors de la mise à jour de la liste des mots parasites.")
 
-#** Étape 3: Récupérez les mots parasites à partir d'un fichier CSV
-parasite_file_path = "parasite.csv"
-resultat3 = recuperer_mots_parasites_from_csv(parasite_file_path)
-print("\nÉtape 3 - fichier .csv:")
-print(resultat3)
-
-#Étape 5 Fonction - Texte sans les balises html
-def retirer_balises_html(html_text):
-    soup = BeautifulSoup(html_text, 'html.parser')
-    texte_sans_balises = soup.get_text(separator=' ', strip=True)
-    return texte_sans_balises
-
-# Testez la fonction avec une chaîne de caractères HTML
-html_text_a_tester = """
-<html>
-    <head>
-        <title>Page HTML de tester</title>
-    </head>
-    <body>
-        <p>Ceci est un <b>exemple</b> de texte <a href="#">HTML</a>.</p>
-        <p>Une autre ligne de texte.</p>
-    </body>
-</html>
-"""
-
-resultat5 = retirer_balises_html(html_text_a_tester)
-print("Étape 5 - Texte sans balises HTML:")
-print(resultat5)
-
-#Étape 6 Fonction - Liste des valeurs associées aux balises
-def extraire_valeurs_attribut(html_text, balise, attribut):
-    valeurs = []
-
-    # Utiliser BeautifulSoup pour analyser le HTML
-    soup = BeautifulSoup(html_text, 'html.parser')
-
-    # Trouver toutes les balises correspondantes
-    balises = soup.find_all(balise)
-
-    # Extraire les valeurs de l'attribut spécifié
-    for balise in balises:
-        valeur = balise.get(attribut)
-        if valeur:
-            valeurs.append(valeur)
-
-    return valeurs
-
-# Testez la fonction avec une chaîne de caractères HTML
-html_text_a_tester = """
-<div>
-<p>Voici une liste de liens : </p>
-    <a href="lien1">Lien 1</a>
-    <a href="lien2">Lien 2</a>
-    <a href="lien3">Lien 3</a>
-  <img src="image1.jpg" alt="Description image 1">
-</div>
-"""
-
-balise_a_chercher = 'a'
-attribut_a_extraire = 'href'
-
-valeurs_attribut = extraire_valeurs_attribut(html_text_a_tester, balise_a_chercher, attribut_a_extraire)
-
-print("Étape 6 - Valeurs associées aux balises:")
-print(valeurs_attribut)
-
-#Étape 7 Fonction - Récupération de toutes les valeurs des attributs alt des balises img
-balise_a_chercher = 'img'
-attribut_a_extraire = 'alt'
-
-valeurs_attribut = extraire_valeurs_attribut(html_text_a_tester, balise_a_chercher, attribut_a_extraire)
-
-print("Étape 7 - Valeurs associées aux balises img:")
-print(valeurs_attribut)
-
-#Étape 8 Fonction - Extraire le nom de domaine
-def extraire_nom_domaine(url):
-    parsed_url = urlparse(url)
-    return parsed_url.netloc
-
-# Testez la fonction avec une URL
-url_a_tester = "https://www.leboncoin.fr/offre/voitures/2444688350"
-nom_domaine = extraire_nom_domaine(url_a_tester)
-
-print("Étape 8 - Nom de domaine extrait de l'URL:")
-print(nom_domaine)
-
-#Étape 9 Fonction - Listes des urls qui font partie du domaine et ceux qui n’en font pas partie
-def trier_urls_par_domaine(nom_domaine, liste_urls):
-    urls_du_domaine = []
-    urls_pas_du_domaine = []
-    for url in liste_urls:
+    def extraire_nom_domaine(self, url):
         parsed_url = urlparse(url)
-        domaine_url = parsed_url.netloc
-        if domaine_url == nom_domaine:
-            urls_du_domaine.append(url)
+        return parsed_url.netloc
+
+    def trier_urls_par_domaine(self, nom_domaine, urls):
+        urls_du_domaine = []
+        urls_pas_du_domaine = []
+        for url in urls:
+            parsed_url = urlparse(url)
+            domaine_url = parsed_url.netloc
+            if domaine_url == nom_domaine:
+                urls_du_domaine.append(url)
+            else:
+                urls_pas_du_domaine.append(url)
+        return urls_du_domaine, urls_pas_du_domaine
+
+    def auditer_page(self, url):
+        texte_html = self.recuperer_html_depuis_url(url)
+
+        if texte_html:
+            soup = BeautifulSoup(texte_html, 'html.parser')
+
+            valeurs_alt = self.extraire_valeurs_attribut(texte_html, 'img', 'alt')
+            pourcentage_alt = (len(valeurs_alt) / len(soup.find_all('img'))) * 100 if soup.find_all('img') else 0
+
+            texte_sans_html = self.supprimer_balises_html(texte_html)
+
+            mots_parasites = self.charger_mots_parasites()
+
+            occurrences_mots_cles = self.compter_occurrences(texte_sans_html)
+            mots_cles_filtres = self.filtrer_mots_parasites(occurrences_mots_cles, mots_parasites)
+
+            liens = self.extraire_valeurs_attribut(texte_html, 'a', 'href')
+
+            domain_urls, non_domain_urls = self.trier_urls_par_domaine(self.extraire_nom_domaine(url), liens)
+
+            top_mots_cles = dict(mots_cles_filtres)
+            mots_cles_utilisateur_present = any(mot in self.mots_cles for mot, _ in top_mots_cles.items())
+            mots_cles_utilisateur_parmi_top3 = any(mot in self.mots_cles for mot in list(top_mots_cles)[:3])
+
+            resultat = {
+                'url': url,
+                'liens_sortants': len(non_domain_urls),
+                'liens_internes': len(domain_urls),
+                'pourcentage_alt_tags': pourcentage_alt,
+                'occurrences_mots_cles_top': top_mots_cles,
+                'mots_cles_utilisateur_present': mots_cles_utilisateur_present,
+                'mots_cles_utilisateur_parmi_top3': mots_cles_utilisateur_parmi_top3
+            }
+
+            self.resultats.append(resultat)
+
+class InterfaceUtilisateur:
+    def __init__(self, analyseur):
+        self.analyseur = analyseur
+        self.root = tk.Tk()
+        self.root.title("Analyseur de Référencement")
+
+        self.creer_interface_principale()
+
+    def creer_interface_principale(self):
+        tk.Label(self.root, text="URL de la première page :").pack()
+        self.entry_url = tk.Entry(self.root, width=50)
+        self.entry_url.pack()
+
+        tk.Label(self.root, text="Mots-clés (séparés par des virgules) :").pack()
+        self.entry_mots_cles = tk.Entry(self.root, width=50)
+        self.entry_mots_cles.pack()
+
+        tk.Label(self.root, text="Mots-clés parasites à ajouter (séparés par des virgules) :").pack()
+        self.entry_nouveaux_mots_parasites = tk.Entry(self.root, width=50)
+        self.entry_nouveaux_mots_parasites.pack()
+
+        ttk.Button(self.root, text="Analyser", command=self.analyser).pack()
+        ttk.Button(self.root, text="Mettre à jour les mots-clés parasites", command=self.mettre_a_jour_mots_parasites).pack()
+
+    def creer_interface_resultats(self):
+        fenetre_resultats = tk.Toplevel(self.root)
+        fenetre_resultats.title("Résultats de l'Analyse")
+
+        tk.Label(fenetre_resultats, text="Résultats de l'analyse").pack()
+
+        listbox_resultats = tk.Listbox(fenetre_resultats, width=100, height=20)
+        listbox_resultats.pack()
+
+        for resultat in self.analyseur.resultats:
+            listbox_resultats.insert(tk.END, f"URL: {resultat['url']}")
+            listbox_resultats.insert(tk.END, f"Liens Sortants: {resultat['liens_sortants']}")
+            listbox_resultats.insert(tk.END, f"Liens Internes: {resultat['liens_internes']}")
+            listbox_resultats.insert(tk.END, f"Pourcentage Balises Alt: {resultat['pourcentage_alt_tags']:.2f}%")
+            listbox_resultats.insert(tk.END, f"Occurences Mots-Clés Top 3: {resultat['occurrences_mots_cles_top']}")
+            listbox_resultats.insert(tk.END, f"Mots-Clés Utilisateur Présents: {'Oui' if resultat['mots_cles_utilisateur_present'] else 'Non'}")
+            listbox_resultats.insert(tk.END, f"Mots-Clés Utilisateur Parmi Top 3: {'Oui' if resultat['mots_cles_utilisateur_parmi_top3'] else 'Non'}")
+            listbox_resultats.insert(tk.END, "\n" + "-"*50 + "\n")
+
+        ttk.Button(fenetre_resultats, text="Sauvegarder le rapport", command=self.sauvegarder_rapport).pack()
+
+    def analyser(self):
+        self.analyseur.url = self.entry_url.get()
+        self.analyseur.mots_cles = [mot.strip() for mot in self.entry_mots_cles.get().split(",")]
+        self.analyseur.resultats = []
+
+        self.analyseur.auditer_page(self.analyseur.url)
+        self.creer_interface_resultats()
+
+    def sauvegarder_rapport(self):
+        try:
+            with open("referencement_report.csv", "a", newline='', encoding='utf-8') as csvfile:
+                fieldnames = ['URL', 'Liens Sortants', 'Liens Internes', 'Pourcentage Balises Alt',
+                              'Occurences Mots-Clés Top 3', 'Mots-Clés Utilisateur Présents',
+                              'Mots-Clés Utilisateur Parmi Top 3']
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames, delimiter='\t')
+
+                # Écrire chaque ligne de résultats
+                for resultat in self.analyseur.resultats:
+                    writer.writerow({
+                        'URL': resultat['url'],
+                        'Liens Sortants': resultat['liens_sortants'],
+                        'Liens Internes': resultat['liens_internes'],
+                        'Pourcentage Balises Alt': f"{resultat['pourcentage_alt_tags']:.2f}%",
+                        'Occurences Mots-Clés Top 3': str(resultat['occurrences_mots_cles_top']),
+                        'Mots-Clés Utilisateur Présents': 'Oui' if resultat['mots_cles_utilisateur_present'] else 'Non',
+                        'Mots-Clés Utilisateur Parmi Top 3': 'Oui' if resultat[
+                            'mots_cles_utilisateur_parmi_top3'] else 'Non',
+                    })
+
+            messagebox.showinfo("Rapport Sauvegardé", "Le rapport a été ajouté avec succès au fichier CSV.")
+        except IOError:
+            messagebox.showerror("Erreur", "Une erreur s'est produite lors de la sauvegarde du rapport.")
+
+    def mettre_a_jour_mots_parasites(self):
+        nouveaux_mots_parasites = [mot.strip() for mot in self.entry_nouveaux_mots_parasites.get().split(",")]
+        if nouveaux_mots_parasites:
+            self.analyseur.mettre_a_jour_mots_cles_parasites(nouveaux_mots_parasites)
+            messagebox.showinfo("Mots-Clés Parasites Mis à Jour", "La liste des mots parasites a été mise à jour avec succès.")
         else:
-            urls_pas_du_domaine.append(url)
-    return urls_du_domaine, urls_pas_du_domaine
+            messagebox.showwarning("Aucun Mot-Clé Parasite", "Veuillez entrer des mots-clés parasites à ajouter.")
 
-# Teste de la fonction avec un nom de domaine et une liste d'URLs
-nom_domaine_a_tester = "www.example.com"
-urls_a_tester = [
-    "https://www.example.com/page1",
-    "https://www.example.com/page2",
-    "https://www.example2.com/page3",
-    "https://www.example.com/page4",
-]
+    def demarrer(self):
+        self.root.mainloop()
 
-urls_du_domaine, urls_pas_du_domaine = trier_urls_par_domaine(nom_domaine_a_tester, urls_a_tester)
-
-print("Étape 9 - URLs faisant partie du domaine:")
-print(urls_du_domaine)
-
-print("\nURLs ne faisant pas partie du domaine:")
-print(urls_pas_du_domaine)
-
-#Étape 10 - Texte HTML de la page
-def recuperer_texte_html_depuis_url(url):
-    reponse = requests.get(url)
-    texte_html = reponse.text
-    return texte_html
-
-# Teste de la fonction avec une URL
-url_a_tester = "https://www.jeuxvideo.com/tous-les-jeux/"
-texte_html = recuperer_texte_html_depuis_url(url_a_tester)
-
-if texte_html:
-    print("Étape 10 - Texte HTML de la page:")
-    print(texte_html[:500])
-
-# Fonction pour auditer une page
-def auditer_page(url, mots_parasites_file):
-    texte_html = recuperer_texte_html_depuis_url(url)
-
-    if texte_html:
-        balises_img_alt = extraire_valeurs_attribut(texte_html, 'img', 'alt')
-        presence_balises_alt = len(balises_img_alt) > 0
-        print("\nPrésence de balises alt avant suppression des balises HTML:", presence_balises_alt)
-
-        texte_sans_balises = retirer_balises_html(texte_html)
-
-        mots_parasites = recuperer_mots_parasites_from_csv(mots_parasites_file)
-
-        occurrences_mots = function1(texte_sans_balises)
-        print("\nMots clés avec les 3 premières valeurs d'occurrences:")
-        print(occurrences_mots[:3])
-
-        occurrences_mots_filtres = filtrer_mots_parasites(occurrences_mots, mots_parasites)
-        print("\nMots clés filtrés:")
-        print(occurrences_mots_filtres)
-
-        liens = extraire_valeurs_attribut(texte_html, 'a', 'href')
-        print("\nNombre de liens sortants:", len(liens))
-
-
-
-url_a_analyser = input("Veuillez entrer l'URL de la page à analyser : ")
-
-mots_parasites_file = "parasite.csv"
-auditer_page(url_a_analyser, mots_parasites_file)
-
-
-
+if __name__ == "__main__":
+    analyseur_referencement = AnalyseurReferencement()
+    interface_utilisateur = InterfaceUtilisateur(analyseur_referencement)
+    interface_utilisateur.demarrer()
